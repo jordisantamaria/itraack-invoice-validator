@@ -8,7 +8,7 @@ const S3_REGION = "eu-south-2";
 
 // Credenciales de AWS (usar variables de entorno en producción)
 const AWS_ACCESS_KEY = process.env.AWS_ACCESS_KEY || "";
-const AWS_SECRET_KEY = process.env.AWS_SECRET_KEY || "";
+const AWS_SECRET_KEY = process.env.AWS_SECRET_ACCESS_KEY || "";
 
 export async function POST(request: NextRequest) {
   try {
