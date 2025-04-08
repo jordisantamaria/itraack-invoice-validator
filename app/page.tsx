@@ -33,6 +33,10 @@ interface InvoiceData {
   }[];
 }
 
+// URL del endpoint de AWS Lambda
+const LAMBDA_ENDPOINT =
+  "https://9vf8qht6s5.execute-api.eu-south-2.amazonaws.com/Prod/invoice";
+
 export default function HomePage() {
   const [file, setFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -72,40 +76,65 @@ export default function HomePage() {
     setIsLoading(true);
 
     try {
-      // Crear un FormData para enviar el archivo
+      // 1. Subir el archivo a S3 a través de nuestra API route
+      console.log("Subiendo archivo a S3...");
       const formData = new FormData();
-      formData.append("pdf", file);
+      formData.append("file", file);
 
-      // Enviar el archivo al servidor
-      const response = await fetch("/api/extract-pdf", {
+      const uploadResponse = await fetch("/api/upload", {
         method: "POST",
         body: formData,
       });
 
-      if (!response.ok) {
-        throw new Error("Error al procesar el PDF");
+      if (!uploadResponse.ok) {
+        const errorData = await uploadResponse.json();
+        throw new Error(
+          errorData.error ||
+            `Error al subir el archivo: ${uploadResponse.status}`
+        );
       }
 
-      const data = await response.json();
-      setResult(data.text);
+      const { s3Key } = await uploadResponse.json();
+      console.log("Archivo subido a S3:", s3Key);
 
-      // Ahora procesamos el texto para extraer los datos estructurados
-      const invoiceResponse = await fetch("/api/extract-invoice-data", {
+      // 2. Llamar a la API Lambda con la clave S3
+      console.log("Procesando archivo con Lambda...");
+      const response = await fetch(LAMBDA_ENDPOINT, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          text: data.text,
+          s3Key: s3Key,
         }),
       });
 
-      if (!invoiceResponse.ok) {
-        throw new Error("Error al extraer los datos de la factura");
+      console.log("Respuesta status:", response.status);
+
+      if (!response.ok) {
+        let errorText;
+        try {
+          const errorData = await response.json();
+          errorText = errorData.error || `Error ${response.status}`;
+        } catch {
+          errorText = (await response.text()) || `Error ${response.status}`;
+        }
+        throw new Error(`Error al procesar el PDF: ${errorText}`);
       }
 
-      const invoiceData = await invoiceResponse.json();
-      setFacturaData(invoiceData);
+      const data = await response.json();
+
+      // Verificar si hay un error en la respuesta
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      // Extraer el texto y los datos de la factura de la respuesta
+      setResult(data.text);
+
+      if (data.invoice) {
+        setFacturaData(data.invoice);
+      }
 
       toast({
         title: "Éxito",
@@ -115,7 +144,10 @@ export default function HomePage() {
       console.error("Error:", error);
       toast({
         title: "Error",
-        description: "Ocurrió un error al procesar el PDF",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Ocurrió un error al procesar el PDF",
         variant: "destructive",
       });
     } finally {

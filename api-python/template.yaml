@@ -1,0 +1,85 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Lambda para procesar facturas y extraer datos estructurados.
+
+Resources:
+  InvoiceBucket:
+    Type: AWS::S3::Bucket
+    # Quitamos la configuración CORS que está causando problemas
+    # La configuraremos manualmente desde la consola
+
+  DependenciesLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: invoice-dependencies
+      Description: Dependencies for invoice processing
+      ContentUri: ./layer/
+      CompatibleRuntimes:
+        - python3.11
+      RetentionPolicy: Retain
+
+  ItraackApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: Prod
+      Cors:
+        AllowOrigin: "'*'"
+        AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+        AllowMethods: "'*'"
+        MaxAge: "'86400'"
+
+  InvoiceFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: app.lambda_handler
+      Runtime: python3.11
+      Timeout: 900
+      MemorySize: 128
+      Environment:
+        Variables:
+          OPENAI_API_KEY: !Ref OpenAIApiKey
+          BUCKET_NAME: !Ref InvoiceBucket
+      Layers:
+        - !Ref DependenciesLayer
+      Architectures:
+        - x86_64
+      Policies:
+        - S3ReadPolicy:
+            BucketName: !Ref InvoiceBucket
+        - S3WritePolicy:
+            BucketName: !Ref InvoiceBucket
+      Events:
+        InvoiceApi:
+          Type: Api
+          Properties:
+            Path: /invoice
+            Method: post
+            RestApiId: !Ref ItraackApi
+        PresignedUrlApi:
+          Type: Api
+          Properties:
+            Path: /presigned-url
+            Method: post
+            RestApiId: !Ref ItraackApi
+
+Parameters:
+  OpenAIApiKey:
+    Type: String
+    Description: API Key para OpenAI
+    NoEcho: true
+
+Outputs:
+  ItraackApi:
+    Description: API Gateway endpoint URL para procesar facturas
+    Value: !Sub "https://${ItraackApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
+  InvoiceFunction:
+    Description: ARN de la función Lambda InvoiceFunction
+    Value: !GetAtt InvoiceFunction.Arn
+  DependenciesLayerArn:
+    Description: ARN del Layer de dependencias
+    Value: !Ref DependenciesLayer
+  BucketName:
+    Description: Nombre del bucket S3 para facturas
+    Value: !Ref InvoiceBucket

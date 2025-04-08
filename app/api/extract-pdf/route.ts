@@ -1,8 +1,5 @@
-import { exec } from "child_process";
-import { randomUUID } from "crypto";
-import { writeFile } from "fs/promises";
 import { NextRequest, NextResponse } from "next/server";
-import { join } from "path";
+import pdfParse from "pdf-parse";
 
 export const runtime = "nodejs";
 
@@ -33,30 +30,11 @@ export async function POST(req: NextRequest) {
       `🔍 ArrayBuffer creado, tamaño: ${arrayBuffer.byteLength} bytes`
     );
 
-    // Crear un archivo temporal
-    const tempFileName = `temp-${randomUUID()}.pdf`;
-    const tempFilePath = join("/tmp", tempFileName);
-    console.log(`🔍 Guardando archivo temporal en ${tempFilePath}`);
-    await writeFile(tempFilePath, new Uint8Array(arrayBuffer));
-
-    // Extraer texto usando pdftotext (si está disponible en el sistema)
-    console.log("🔍 Intentando extraer texto con método alternativo");
-
     try {
-      const text = await new Promise<string>((resolve, reject) => {
-        // Intentar usar pdftotext si está disponible
-        exec(
-          `pdftotext -layout "${tempFilePath}" -`,
-          (error, stdout, stderr) => {
-            if (error) {
-              console.log("❌ Error al ejecutar pdftotext:", error);
-              reject(new Error("No se pudo extraer el texto del PDF"));
-              return;
-            }
-            resolve(stdout);
-          }
-        );
-      });
+      // Usar pdf-parse para extraer el texto
+      console.log("🔍 Extrayendo texto con pdf-parse");
+      const data = await pdfParse(Buffer.from(arrayBuffer));
+      const text = data.text;
 
       console.log("✅ Extracción completada");
       console.log(
@@ -67,8 +45,8 @@ export async function POST(req: NextRequest) {
       );
 
       return NextResponse.json({ text });
-    } catch (execError) {
-      console.error("❌ Error al extraer texto:", execError);
+    } catch (parseError) {
+      console.error("❌ Error al extraer texto con pdf-parse:", parseError);
       return NextResponse.json(
         {
           error:
