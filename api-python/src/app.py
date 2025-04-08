@@ -25,29 +25,10 @@ logger = logging.getLogger(__name__)
 s3_client = boto3.client('s3')
 BUCKET_NAME = os.environ.get('BUCKET_NAME')
 
-def generate_presigned_url(s3_key, content_type):
-    """
-    Genera una URL prefirmada para subir un archivo a S3
-    """
-    try:
-        presigned_url = s3_client.generate_presigned_url(
-            'put_object',
-            Params={
-                'Bucket': BUCKET_NAME,
-                'Key': s3_key,
-                'ContentType': content_type
-            },
-            ExpiresIn=300  # URL válida por 5 minutos
-        )
-        return presigned_url
-    except Exception as e:
-        logger.error(f"Error al generar URL prefirmada: {str(e)}")
-        return None
-
 def lambda_handler(event, context):
     """
     Función handler para AWS Lambda.
-    Maneja diferentes rutas según el path de la solicitud.
+    Maneja solicitudes para procesar facturas.
     """
     logger.info("Recibiendo solicitud Lambda")
     
@@ -64,104 +45,8 @@ def lambda_handler(event, context):
             'body': ''
         }
     
-    # Obtener la ruta de la solicitud
-    path = event.get('path', '')
-    
-    # Manejar diferentes rutas
-    if path.endswith('/presigned-url'):
-        return handle_presigned_url_request(event)
-    else:
-        return handle_invoice_processing(event)
-
-def handle_presigned_url_request(event):
-    """
-    Maneja solicitudes para generar URLs prefirmadas
-    """
-    try:
-        # Obtener el cuerpo de la solicitud
-        if 'body' not in event:
-            return {
-                'statusCode': 400,
-                'headers': {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*'
-                },
-                'body': json.dumps({
-                    'error': 'No se proporcionó el cuerpo de la solicitud'
-                })
-            }
-        
-        # Parsear el cuerpo JSON
-        body = event['body']
-        if isinstance(body, str):
-            body = json.loads(body)
-        else:
-            # Si está codificado en base64, decodificar y parsear
-            is_base64_encoded = event.get('isBase64Encoded', False)
-            if is_base64_encoded:
-                body = json.loads(base64.b64decode(body).decode('utf-8'))
-        
-        # Obtener los parámetros necesarios
-        if 'fileName' not in body or 'contentType' not in body:
-            return {
-                'statusCode': 400,
-                'headers': {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*'
-                },
-                'body': json.dumps({
-                    'error': 'Se requieren fileName y contentType'
-                })
-            }
-        
-        file_name = body['fileName']
-        content_type = body['contentType']
-        
-        # Generar un nombre único para el archivo en S3
-        timestamp = int(time.time() * 1000)
-        random_string = ''.join(random.choices('abcdefghijklmnopqrstuvwxyz0123456789', k=8))
-        s3_key = f"uploads/{timestamp}-{random_string}-{file_name}"
-        
-        # Generar URL prefirmada
-        presigned_url = generate_presigned_url(s3_key, content_type)
-        
-        if not presigned_url:
-            return {
-                'statusCode': 500,
-                'headers': {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*'
-                },
-                'body': json.dumps({
-                    'error': 'Error al generar URL prefirmada'
-                })
-            }
-        
-        # Devolver la URL prefirmada y la clave S3
-        return {
-            'statusCode': 200,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
-            'body': json.dumps({
-                'presignedUrl': presigned_url,
-                's3Key': s3_key
-            })
-        }
-        
-    except Exception as e:
-        logger.error(f"Error al generar URL prefirmada: {str(e)}")
-        return {
-            'statusCode': 500,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
-            'body': json.dumps({
-                'error': f'Error interno del servidor: {str(e)}'
-            })
-        }
+    # Procesar la factura
+    return handle_invoice_processing(event)
 
 def handle_invoice_processing(event):
     """
