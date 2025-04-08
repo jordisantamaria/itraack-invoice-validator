@@ -7,8 +7,21 @@ const S3_BUCKET_NAME = "itraack-invoice-api-invoicebucket-pmw3pdqs01qn";
 const S3_REGION = "eu-south-2";
 
 // Credenciales de AWS (usar variables de entorno en producción)
-const AWS_ACCESS_KEY = process.env.AWS_ACCESS_KEY || "";
+const AWS_ACCESS_KEY = process.env.AWS_ACCESS_KEY_ID || "";
 const AWS_SECRET_KEY = process.env.AWS_SECRET_ACCESS_KEY || "";
+
+// Añadir logs para depuración
+console.log("AWS Credentials Check:");
+console.log(
+  "Access Key defined:",
+  AWS_ACCESS_KEY ? "YES : " + AWS_ACCESS_KEY + ")" : "NO"
+);
+console.log(
+  "Secret Key defined:",
+  AWS_SECRET_KEY ? "YES : " + AWS_SECRET_KEY + ")" : "NO"
+);
+console.log("Region:", S3_REGION);
+console.log("Bucket:", S3_BUCKET_NAME);
 
 export async function POST(request: NextRequest) {
   try {

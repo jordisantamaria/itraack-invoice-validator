@@ -294,7 +294,7 @@ if __name__ == "__main__":
     # Configuración para pruebas locales
     test_event = {
         'body': json.dumps({
-            's3Key': 'test/sample.pdf'  # Clave de prueba
+            's3Key': 'uploads/1744151197067-q7o8tbb0-shenker0.pdf'  # Clave de prueba
         })
     }
     

@@ -119,6 +119,18 @@ export default function HomePage() {
         } catch {
           errorText = (await response.text()) || `Error ${response.status}`;
         }
+
+        // Mejorar el mensaje de error para problemas de autenticación de AWS
+        if (
+          errorText.includes("AuthorizationHeaderMalformed") ||
+          errorText.includes("Access Key") ||
+          errorText.includes("credentials")
+        ) {
+          throw new Error(
+            "Error de autenticación con AWS S3. Verifica que las credenciales AWS_ACCESS_KEY_ID y AWS_SECRET_ACCESS_KEY estén correctamente configuradas en el servidor."
+          );
+        }
+
         throw new Error(`Error al procesar el PDF: ${errorText}`);
       }
 
